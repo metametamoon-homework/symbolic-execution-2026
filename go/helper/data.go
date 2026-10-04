@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"go/constant"
 	"go/types"
 
 	"golang.org/x/tools/go/ssa"
+	"golang.org/x/tools/go/types/typeutil"
 )
 
 type Block struct {
@@ -19,20 +21,24 @@ type Func struct {
 }
 
 type Program struct {
+	Types  []any  `json:"types"`
 	Values []any  `json:"values"`
 	Instrs []any  `json:"instrs"`
 	Funcs  []Func `json:"funcs"`
 }
 
 type SsaCache struct {
+	Types         []any
 	Values        []any
 	Instrs        []any
+	typeResolver  typeutil.Map
 	valueResolver map[ssa.Value]int
 	instrResolver map[ssa.Instruction]int
 }
 
 func newSsaCache() *SsaCache {
 	return &SsaCache{
+		Types:         []any{},
 		Values:        []any{},
 		Instrs:        []any{},
 		valueResolver: map[ssa.Value]int{},
@@ -41,7 +47,63 @@ func newSsaCache() *SsaCache {
 }
 
 func uploadTypeToCache(t types.Type, cache *SsaCache) int {
-	return -1
+	if index, ok := cache.typeResolver.At(t).(int); ok {
+		return index
+	}
+	index := len(cache.Types)
+	cache.Types = append(cache.Types, nil)
+	cache.typeResolver.Set(t, index)
+	cache.Types[index] = typeRepr(t, cache)
+	return index
+}
+
+func uploadTupleToCache(in *types.Tuple, cache *SsaCache) []int {
+	result := make([]int, in.Len())
+	for i := range result {
+		result[i] = uploadTypeToCache(in.At(i).Type(), cache)
+	}
+	return result
+}
+
+func typeRepr(in types.Type, cache *SsaCache) map[string]any {
+	switch in := in.(type) {
+	case *types.Basic:
+		return map[string]any{
+			"kind": "basic",
+			"name": in.Name(),
+		}
+	case *types.Pointer:
+		return map[string]any{
+			"kind": "pointer",
+			"elem": uploadTypeToCache(in.Elem(), cache),
+		}
+	case *types.Slice:
+		return map[string]any{
+			"kind": "slice",
+			"elem": uploadTypeToCache(in.Elem(), cache),
+		}
+	case *types.Interface:
+		if !in.Empty() {
+			panic(fmt.Sprintf("unhandled non-empty interface %v", in))
+		}
+		return map[string]any{
+			"kind": "interface",
+		}
+	case *types.Signature:
+		return map[string]any{
+			"kind":    "signature",
+			"params":  uploadTupleToCache(in.Params(), cache),
+			"results": uploadTupleToCache(in.Results(), cache),
+		}
+	}
+	panic(fmt.Sprintf("unhandled type %T", in))
+}
+
+func constRepr(in *ssa.Const) any {
+	if in.Value != nil && in.Value.Kind() == constant.String {
+		return constant.StringVal(in.Value)
+	}
+	return in.Value
 }
 
 func uploadValueToCache(in ssa.Value, cache *SsaCache) int {
@@ -91,17 +153,19 @@ func valueRepr(in ssa.Value, cache *SsaCache) map[string]any {
 	case *ssa.Builtin:
 		return map[string]any{
 			"kind": "builtin",
+			"type": uploadTypeToCache(in.Type(), cache),
 			"name": in.Name(),
 		}
 	case *ssa.Const:
 		return map[string]any{
 			"kind":       "const",
 			"type":       uploadTypeToCache(in.Type(), cache),
-			"constvalue": in.Value,
+			"constvalue": constRepr(in),
 		}
 	case *ssa.Function:
 		return map[string]any{
 			"kind": "function",
+			"type": uploadTypeToCache(in.Type(), cache),
 		}
 	case *ssa.Global:
 		return map[string]any{

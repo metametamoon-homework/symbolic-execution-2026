@@ -4,14 +4,20 @@ import kotlinx.serialization.json.JsonElement
 
 sealed interface TrueInst
 
-sealed interface TrueValue
+sealed interface TrueValue {
+  val type: TrueType
+}
+
+sealed interface TrueType
 
 class Cache(
   private val rawInsts: List<Instruction>,
   private val rawValues: List<Value>,
+  private val rawTypes: List<Type>,
 ) {
   private val createdInstsCache = mutableMapOf<Int, TrueInst>()
   private val createdValuesCache = mutableMapOf<Int, TrueValue>()
+  private val createdTypesCache = mutableMapOf<Int, TrueType>()
 
   fun instantiateInstByIndex(i: Int): TrueInst =
     createdInstsCache.getOrPut(i) { convertInst(rawInsts[i]) }
@@ -19,15 +25,18 @@ class Cache(
   fun instantiateValueByIndex(i: Int): TrueValue =
     createdValuesCache.getOrPut(i) { convertValue(rawValues[i]) }
 
+  fun instantiateTypeByIndex(i: Int): TrueType =
+    createdTypesCache.getOrPut(i) { convertType(rawTypes[i]) }
+
   private fun convertInst(rawInst: Instruction): TrueInst =
     when (rawInst) {
-      is UnOp -> TrueUnOp(rawInst.op, rawInst.arg, this)
-      is BinOp -> TrueBinOp(rawInst.op, rawInst.lhs, rawInst.rhs, this)
-      is Alloc -> TrueAlloc(rawInst.heap)
-      is Call -> TrueCall(rawInst.value, rawInst.args, this)
-      is IndexAddr -> TrueIndexAddr(rawInst.collection, rawInst.index, this)
-      is MakeInterface -> TrueMakeInterface(rawInst.value, this)
-      is Phi -> TruePhi(rawInst.edges, this)
+      is UnOp -> TrueUnOp(rawInst.type, rawInst.op, rawInst.arg, this)
+      is BinOp -> TrueBinOp(rawInst.type, rawInst.op, rawInst.lhs, rawInst.rhs, this)
+      is Alloc -> TrueAlloc(rawInst.type, rawInst.heap, this)
+      is Call -> TrueCall(rawInst.type, rawInst.value, rawInst.args, this)
+      is IndexAddr -> TrueIndexAddr(rawInst.type, rawInst.collection, rawInst.index, this)
+      is MakeInterface -> TrueMakeInterface(rawInst.type, rawInst.value, this)
+      is Phi -> TruePhi(rawInst.type, rawInst.edges, this)
       is If -> TrueIf(rawInst.cond, this)
       is Jump -> TrueJump()
       is Panic -> TruePanic(rawInst.value, this)
@@ -44,58 +53,76 @@ class Cache(
           ?: error(
             "instruction ${rawValue.index} (${rawInsts[rawValue.index]}) does not produce a value"
           )
-      is Parameter -> TrueParameter(rawValue.name)
-      is Builtin -> TrueBuiltin(rawValue.name)
-      is Const -> TrueConst(rawValue.value)
-      is FunctionRef -> TrueFunctionRef()
-      is Opaque -> TrueOpaque()
-      is Global -> TrueGlobal(rawValue.name)
+      is Parameter -> TrueParameter(rawValue.type, rawValue.name, this)
+      is Builtin -> TrueBuiltin(rawValue.type, rawValue.name, this)
+      is Const -> TrueConst(rawValue.type, rawValue.value, this)
+      is FunctionRef -> TrueFunctionRef(rawValue.type, this)
+      is Opaque -> TrueOpaque(rawValue.type, this)
+      is Global -> TrueGlobal(rawValue.type, rawValue.name, this)
+    }
+
+  private fun convertType(rawType: Type): TrueType =
+    when (rawType) {
+      is BasicType -> TrueBasicType(rawType.name)
+      is PointerType -> TruePointerType(rawType.elem, this)
+      is SliceType -> TrueSliceType(rawType.elem, this)
+      is InterfaceType -> TrueInterfaceType()
+      is SignatureType -> TrueSignatureType(rawType.params, rawType.results, this)
     }
 }
 
-class TrueUnOp(val op: String, private val rawArg: Int, private val cache: Cache) :
-  TrueInst, TrueValue {
+/** The instructions that have `register` prefix in go's type struct definitions */
+abstract class TypedValue(private val rawType: Int, private val cache: Cache) : TrueValue {
+  override val type: TrueType by lazy { cache.instantiateTypeByIndex(rawType) }
+}
+
+class TrueUnOp(rawType: Int, val op: String, private val rawArg: Int, private val cache: Cache) :
+  TypedValue(rawType, cache), TrueInst {
   val arg: TrueValue by lazy { cache.instantiateValueByIndex(rawArg) }
 }
 
 class TrueBinOp(
+  rawType: Int,
   val op: String,
   private val rawLhs: Int,
   private val rawRhs: Int,
   private val cache: Cache,
-) : TrueInst, TrueValue {
+) : TypedValue(rawType, cache), TrueInst {
   val lhs: TrueValue by lazy { cache.instantiateValueByIndex(rawLhs) }
   val rhs: TrueValue by lazy { cache.instantiateValueByIndex(rawRhs) }
 }
 
-class TrueAlloc(val heap: Boolean) : TrueInst, TrueValue
+class TrueAlloc(rawType: Int, val heap: Boolean, cache: Cache) :
+  TypedValue(rawType, cache), TrueInst
 
 class TrueCall(
+  rawType: Int,
   private val rawCallee: Int,
   private val rawArgs: List<Int>,
   private val cache: Cache,
-) : TrueInst, TrueValue {
+) : TypedValue(rawType, cache), TrueInst {
   val callee: TrueValue by lazy { cache.instantiateValueByIndex(rawCallee) }
   val args: List<TrueValue> by lazy { rawArgs.map { cache.instantiateValueByIndex(it) } }
 }
 
 class TrueIndexAddr(
+  rawType: Int,
   private val rawCollection: Int,
   private val rawIndex: Int,
   private val cache: Cache,
-) : TrueInst, TrueValue {
+) : TypedValue(rawType, cache), TrueInst {
   val collection: TrueValue by lazy { cache.instantiateValueByIndex(rawCollection) }
   val index: TrueValue by lazy { cache.instantiateValueByIndex(rawIndex) }
 }
 
-class TrueMakeInterface(private val rawValue: Int, private val cache: Cache) : TrueInst, TrueValue {
+class TrueMakeInterface(rawType: Int, private val rawValue: Int, private val cache: Cache) :
+  TypedValue(rawType, cache), TrueInst {
   val value: TrueValue by lazy { cache.instantiateValueByIndex(rawValue) }
 }
 
-class TruePhi(private val rawPrevs: List<Int>, private val cache: Cache) : TrueInst, TrueValue {
-  val sources: List<TrueValue> by lazy {
-    rawPrevs.map { cache.instantiateValueByIndex(it) }
-  }
+class TruePhi(rawType: Int, private val rawPrevs: List<Int>, private val cache: Cache) :
+  TypedValue(rawType, cache), TrueInst {
+  val sources: List<TrueValue> by lazy { rawPrevs.map { cache.instantiateValueByIndex(it) } }
 }
 
 class TrueIf(private val rawCond: Int, private val cache: Cache) : TrueInst {
@@ -122,14 +149,35 @@ class TrueReturn(private val rawResults: List<Int>, private val cache: Cache) : 
   val results: List<TrueValue> by lazy { rawResults.map { cache.instantiateValueByIndex(it) } }
 }
 
-class TrueParameter(val name: String) : TrueValue
+class TrueParameter(rawType: Int, val name: String, cache: Cache) : TypedValue(rawType, cache)
 
-class TrueBuiltin(val name: String) : TrueValue
+class TrueBuiltin(rawType: Int, val name: String, cache: Cache) : TypedValue(rawType, cache)
 
-class TrueConst(val value: JsonElement) : TrueValue
+class TrueConst(rawType: Int, val value: JsonElement, cache: Cache) : TypedValue(rawType, cache)
 
-class TrueFunctionRef : TrueValue
+class TrueFunctionRef(rawType: Int, cache: Cache) : TypedValue(rawType, cache)
 
-class TrueOpaque : TrueValue
+class TrueOpaque(rawType: Int, cache: Cache) : TypedValue(rawType, cache)
 
-class TrueGlobal(val name: String) : TrueValue
+class TrueGlobal(rawType: Int, val name: String, cache: Cache) : TypedValue(rawType, cache)
+
+class TrueBasicType(val name: String) : TrueType
+
+class TruePointerType(private val rawElem: Int, private val cache: Cache) : TrueType {
+  val elem: TrueType by lazy { cache.instantiateTypeByIndex(rawElem) }
+}
+
+class TrueSliceType(private val rawElem: Int, private val cache: Cache) : TrueType {
+  val elem: TrueType by lazy { cache.instantiateTypeByIndex(rawElem) }
+}
+
+class TrueInterfaceType : TrueType
+
+class TrueSignatureType(
+  private val rawParams: List<Int>,
+  private val rawResults: List<Int>,
+  private val cache: Cache,
+) : TrueType {
+  val params: List<TrueType> by lazy { rawParams.map { cache.instantiateTypeByIndex(it) } }
+  val results: List<TrueType> by lazy { rawResults.map { cache.instantiateTypeByIndex(it) } }
+}

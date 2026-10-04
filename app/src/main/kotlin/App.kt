@@ -16,6 +16,7 @@ data class Block(
 
 @Serializable
 data class Program(
+  val types: List<Type> = emptyList(),
   val values: List<Value> = emptyList(),
   val instrs: List<Instruction> = emptyList(),
   val funcs: List<Func> = emptyList(),
@@ -68,7 +69,7 @@ fun main() {
       ),
       File("/home/metametamoon/workspace/learning/symbolic-execution/se-repo/go/example-1"),
     )
-  val cacheA = Cache(rawInsts = result.instrs, rawValues = result.values)
+  val cacheA = Cache(rawInsts = result.instrs, rawValues = result.values, rawTypes = result.types)
 
   val convertedResult = result.translate(cacheA)
   println(convertedResult)

@@ -74,7 +74,7 @@ func main() {
 		}
 		funcs = append(funcs, f)
 	}
-	out := Program{Values: cache.Values, Instrs: cache.Instrs, Funcs: funcs}
+	out := Program{Types: cache.Types, Values: cache.Values, Instrs: cache.Instrs, Funcs: funcs}
 
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "   ")
