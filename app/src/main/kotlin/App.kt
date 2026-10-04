@@ -72,23 +72,13 @@ fun main() {
   val cacheA = Cache(rawInsts = result.instrs, rawValues = result.values, rawTypes = result.types)
 
   val convertedResult = result.translate(cacheA)
-  println(convertedResult)
-
-  //  println(prettyJson.encodeToString(result).replace("\n", "\n"))
-  //  val instructions = listOf(
-  //    Phi(edges = listOf(0, 1)),
-  //    BinOp(op = "+", lhs = 3, rhs = 2),
-  //  )
-  //  val values = listOf(
-  //    InstructionValue(index = 1),
-  //    Parameter(name = "x"),
-  //    Const(value = JsonPrimitive(1)),
-  //    InstructionValue(index = 0),
-  //  )
-  //  val cache = Cache(rawInsts = instructions, rawValues = values)
-  //  val phi = cache.instantiateInstByIndex(0) as TruePhi
-  //  val add = phi.sources[0] as TrueBinOp
-  //  println(phi.sources)
-  //  println(add.lhs === phi)
-  //  println(add.rhs)
+  for (func in convertedResult.funcs) {
+    println("${func.name}:")
+    println("${func.blocks.size} blocks")
+    val lists =
+      func.blocks.mapIndexed { index, block -> "$index -> ${block.succs}" }.joinToString("\n\t")
+    println("Block edges:")
+    println("\t" + lists)
+    println()
+  }
 }
