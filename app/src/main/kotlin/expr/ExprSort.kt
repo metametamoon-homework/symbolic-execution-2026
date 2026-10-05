@@ -2,6 +2,6 @@ package com.github.metametamoon.app.expr
 
 sealed interface ExprSort
 
-class Int32Sort : ExprSort
+class Bv32Sort : ExprSort
 
 class BoolSort : ExprSort
