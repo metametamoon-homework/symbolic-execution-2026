@@ -9,8 +9,8 @@ class Z3Translator(private val z3ctx: Context) {
   fun <Sort : ExprSort> translate(expr: GgExpr<Sort>): com.microsoft.z3.Expr<*> {
     return when (expr) {
       is Eq -> z3ctx.mkEq(translate(expr.left), translate(expr.right))
-      is Int32Const -> z3ctx.mkIntConst(expr.name)
-      is Int32Value -> z3ctx.mkInt(expr.value)
+      is IntConst -> z3ctx.mkIntConst(expr.name)
+      is IntValue -> z3ctx.mkInt(expr.value)
       is Add ->
         z3ctx.mkAdd<ArithSort>(
           translate(expr.left).uncheckedCast(),

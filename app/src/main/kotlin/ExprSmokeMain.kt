@@ -3,8 +3,8 @@ package com.github.metametamoon.app
 import com.github.metametamoon.app.expr.Add
 import com.github.metametamoon.app.expr.And
 import com.github.metametamoon.app.expr.Gt
-import com.github.metametamoon.app.expr.Int32Const
-import com.github.metametamoon.app.expr.Int32Value
+import com.github.metametamoon.app.expr.IntConst
+import com.github.metametamoon.app.expr.IntValue
 import com.github.metametamoon.app.expr.Lt
 import com.github.metametamoon.app.expr.Z3Translator
 import com.microsoft.z3.Context
@@ -12,9 +12,9 @@ import com.microsoft.z3.Context
 fun main() {
   println("=== Symbolic Expressions Demo ===")
 
-  val x = Int32Const("x")
-  val y = Int32Const("y")
-  val five = Int32Value(5)
+  val x = IntConst("x")
+  val y = IntConst("y")
+  val five = IntValue(5)
 
   val sum = Add(x, y)
   val condition = Gt(sum, five)
@@ -28,8 +28,8 @@ fun main() {
     val z3Expr = translator.translate(condition)
     println("Z3 expression created: ${z3Expr::class.simpleName}")
 
-    val zero = Int32Value(0)
-    val ten = Int32Value(10)
+    val zero = IntValue(0)
+    val ten = IntValue(10)
 
     val cond1 = Gt(x, zero)
     val cond2 = Lt(y, ten)

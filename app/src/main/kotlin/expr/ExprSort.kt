@@ -2,6 +2,7 @@ package com.github.metametamoon.app.expr
 
 sealed interface ExprSort
 
-class Bv32Sort : ExprSort
+/** Integer numbers, aka ZZ */
+class GgIntSort : ExprSort
 
-class BoolSort : ExprSort
+class GgBoolSort : ExprSort
