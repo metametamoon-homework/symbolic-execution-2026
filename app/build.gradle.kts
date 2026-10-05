@@ -12,6 +12,7 @@ dependencies {
   implementation(project(":utils"))
 
   implementation(libs.bundles.kotlinxEcosystem)
+  implementation(files("/home/metametamoon/z3-5.1.0-x64-glibc-2.39/bin/com.microsoft.z3.jar"))
 }
 
 application {
