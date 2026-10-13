@@ -21,6 +21,7 @@ tasks.withType<Test>().configureEach {
 
   // Log information about all test results, not only the failed ones.
   testLogging {
+    showStandardStreams = true
     events(
       TestLogEvent.FAILED,
       TestLogEvent.PASSED,

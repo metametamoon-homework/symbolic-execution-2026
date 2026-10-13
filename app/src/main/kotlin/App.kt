@@ -12,7 +12,8 @@ data class Block(
   val prevs: List<Int> = emptyList(),
 )
 
-@Serializable data class Func(val name: String, val blocks: List<Block> = emptyList())
+@Serializable
+data class Func(val name: String, val goName: String, val blocks: List<Block> = emptyList())
 
 @Serializable
 data class Program(
@@ -30,7 +31,8 @@ data class TrueBlock(
   val prefs: List<Int> = emptyList(),
 )
 
-@Serializable data class TrueFunc(val name: String, val blocks: List<TrueBlock> = emptyList())
+@Serializable
+data class TrueFunc(val name: String, val goName: String, val blocks: List<TrueBlock> = emptyList())
 
 @Serializable data class TrueProgram(val funcs: List<TrueFunc> = emptyList())
 
@@ -40,20 +42,15 @@ private val json = Json {
   classDiscriminator = "kind"
 }
 
-fun loadSsa(helper: File, goProjectDir: File): Program {
-  val p =
-    ProcessBuilder(helper.path, goProjectDir.path)
-      .redirectError(ProcessBuilder.Redirect.INHERIT)
-      .start()
-  val text = p.inputStream.bufferedReader().readText()
-  val errors = p.errorStream.bufferedReader().readText()
-  println("errs:$errors")
-  check(p.waitFor() == 0) { "go-ssa-dump failed" }
-  return json.decodeFromString(text)
+private fun loadSsa(helper: File, goProjectDir: File): Program {
+  val result = runProcess(helper.path, goProjectDir.path)
+  println("errs:${result.stderr}")
+  check(result.exitCode == 0) { "go-ssa-dump failed:\n${result.stderr}" }
+  return json.decodeFromString(result.stdout)
 }
 
 fun Func.translate(cache: Cache): TrueFunc =
-  TrueFunc(name = name, blocks = blocks.map { it.translate(cache) })
+  TrueFunc(name = name, goName = goName, blocks = blocks.map { it.translate(cache) })
 
 fun Block.translate(cache: Cache): TrueBlock =
   TrueBlock(index, succs, instrs.map { cache.instantiateInstByIndex(it) })
@@ -62,16 +59,13 @@ fun Program.translate(cache: Cache): TrueProgram =
   TrueProgram(funcs = funcs.map { it.translate(cache) })
 
 fun main() {
-  val result =
-    loadSsa(
-      File(
-        "/home/metametamoon/workspace/learning/symbolic-execution/se-repo/go/helper/go-ssa-dump"
-      ),
-      File("/home/metametamoon/workspace/learning/symbolic-execution/se-repo/go/example-1"),
-    )
-  val cacheA = Cache(rawInsts = result.instrs, rawValues = result.values, rawTypes = result.types)
+  val analyzedProjectDir =
+    File("/home/metametamoon/workspace/learning/symbolic-execution/se-repo/go/example-1")
+  val convertedResult = fullyLoadSsa(analyzedProjectDir)
+  printSsaInfo(convertedResult)
+}
 
-  val convertedResult = result.translate(cacheA)
+fun printSsaInfo(convertedResult: TrueProgram) {
   for (func in convertedResult.funcs) {
     println("${func.name}:")
     println("${func.blocks.size} blocks")
@@ -81,4 +75,16 @@ fun main() {
     println("\t" + lists)
     println()
   }
+}
+
+fun fullyLoadSsa(analyzedProjectDir: File): TrueProgram {
+  val result =
+    loadSsa(
+      File("../go/helper/go-ssa-dump"),
+      analyzedProjectDir,
+    )
+  val cacheA = Cache(rawInsts = result.instrs, rawValues = result.values, rawTypes = result.types)
+
+  val convertedResult = result.translate(cacheA)
+  return convertedResult
 }

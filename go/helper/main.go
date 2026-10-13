@@ -61,7 +61,7 @@ func main() {
 		if !mine[fn.Pkg] || fn.Blocks == nil {
 			continue
 		}
-		f := Func{Name: fn.String()}
+		f := Func{Name: fn.String(), GoName: fn.Name()}
 		for _, b := range fn.Blocks {
 			bb := Block{Index: b.Index}
 			for _, s := range b.Succs {
