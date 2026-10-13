@@ -12,6 +12,8 @@ dependencies {
   implementation(project(":utils"))
 
   implementation(libs.bundles.kotlinxEcosystem)
+  implementation(libs.z3Turnkey)
+  testImplementation(kotlin("test"))
 }
 
 application {

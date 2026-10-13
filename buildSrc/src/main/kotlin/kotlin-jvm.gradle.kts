@@ -12,7 +12,7 @@ plugins {
 
 kotlin {
   // Use a specific Java version to make it easier to work in different environments.
-  jvmToolchain(26)
+  jvmToolchain(17)
 }
 
 tasks.withType<Test>().configureEach {
@@ -21,6 +21,7 @@ tasks.withType<Test>().configureEach {
 
   // Log information about all test results, not only the failed ones.
   testLogging {
+    showStandardStreams = true
     events(
       TestLogEvent.FAILED,
       TestLogEvent.PASSED,
