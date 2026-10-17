@@ -1,23 +1,20 @@
 package com.github.metametamoon.app
 
-import com.github.metametamoon.app.expr.Add
-import com.github.metametamoon.app.expr.And
-import com.github.metametamoon.app.expr.Gt
-import com.github.metametamoon.app.expr.IntConst
-import com.github.metametamoon.app.expr.IntValue
-import com.github.metametamoon.app.expr.Lt
+import com.github.metametamoon.app.expr.GgContext
 import com.github.metametamoon.app.expr.Z3Translator
 import com.microsoft.z3.Context
 
 fun main() {
   println("=== Symbolic Expressions Demo ===")
 
-  val x = IntConst("x")
-  val y = IntConst("y")
-  val five = IntValue(5)
+  val ctx = GgContext()
 
-  val sum = Add(x, y)
-  val condition = Gt(sum, five)
+  val x = ctx.mkIntConst("x")
+  val y = ctx.mkIntConst("y")
+  val five = ctx.mkIntValue(5)
+
+  val sum = ctx.mkAdd(x, y)
+  val condition = ctx.mkGt(sum, five)
 
   println("Expression: ${condition.toExprString()}")
   println("Expression sort: ${condition.sort}")
@@ -28,13 +25,13 @@ fun main() {
     val z3Expr = translator.translate(condition)
     println("Z3 expression created: ${z3Expr::class.simpleName}")
 
-    val zero = IntValue(0)
-    val ten = IntValue(10)
+    val zero = ctx.mkIntValue(0)
+    val ten = ctx.mkIntValue(10)
 
-    val cond1 = Gt(x, zero)
-    val cond2 = Lt(y, ten)
+    val cond1 = ctx.mkGt(x, zero)
+    val cond2 = ctx.mkLt(y, ten)
 
-    val andExpr = And(listOf(cond1, cond2))
+    val andExpr = ctx.mkAnd(listOf(cond1, cond2))
     println("Compound expression: ${andExpr.toExprString()}")
 
     val z3AndExpr = translator.translate(andExpr)

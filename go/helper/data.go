@@ -18,6 +18,7 @@ type Block struct {
 type Func struct {
 	Name   string  `json:"name"`
 	GoName string  `json:"goName"`
+	Params []int   `json:"params"`
 	Blocks []Block `json:"blocks"`
 }
 

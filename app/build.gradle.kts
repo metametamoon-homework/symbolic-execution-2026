@@ -10,7 +10,7 @@ plugins {
 
 dependencies {
   implementation(project(":utils"))
-
+  implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.2")
   implementation(libs.bundles.kotlinxEcosystem)
   implementation(libs.z3Turnkey)
   testImplementation(kotlin("test"))

@@ -1,24 +1,32 @@
 package com.github.metametamoon.app.expr
 
-import com.microsoft.z3.Context
-import com.microsoft.z3.Expr
-import com.microsoft.z3.IntExpr
+interface ExprVisitor {
+  val ctx: GgContext
 
-sealed interface ExprVisitor<T> {
+  fun visitIntValue(expr: IntValue): GgExpr<GgIntSort> = expr
 
-  fun visitInt32Const(expr: IntConst): T
+  fun visitBoolValue(expr: BoolValue): GgExpr<GgBoolSort> = expr
 
-  fun visitEq(expr: Eq): T
+  fun visitInt32Const(expr: IntConst): GgExpr<GgIntSort> = expr
 
-  fun apply(expr: GgExpr<*>): T = expr.accept(this)
-}
+  fun visitEq(expr: Eq): GgExpr<GgBoolSort> =
+    ctx.mkEq(expr.left.accept(this), expr.right.accept(this))
 
-class Z3TranslatorVisitor(val z3ctx: Context) : ExprVisitor<Expr<*>> {
-  override fun visitInt32Const(expr: IntConst): IntExpr {
-    return z3ctx.mkIntConst(expr.name)
-  }
+  fun visitAdd(expr: Add): GgExpr<GgIntSort> =
+    ctx.mkAdd(expr.left.accept(this), expr.right.accept(this))
 
-  override fun visitEq(expr: Eq): Expr<*> {
-    return z3ctx.mkEq(apply(expr.left), apply(expr.right))
-  }
+  fun visitMul(expr: Mul): GgExpr<GgIntSort> =
+    ctx.mkMul(expr.left.accept(this), expr.right.accept(this))
+
+  fun visitGt(expr: Gt): GgExpr<GgBoolSort> =
+    ctx.mkGt(expr.left.accept(this), expr.right.accept(this))
+
+  fun visitLt(expr: Lt): GgExpr<GgBoolSort> =
+    ctx.mkLt(expr.left.accept(this), expr.right.accept(this))
+
+  fun visitAnd(expr: And): GgExpr<GgBoolSort> = ctx.mkAnd(expr.operands.map { it.accept(this) })
+
+  fun visitNot(expr: Not): GgExpr<GgBoolSort> = ctx.mkNot(expr.operand.accept(this))
+
+  fun apply(expr: GgExpr<*>): GgExpr<*> = expr.accept(this)
 }

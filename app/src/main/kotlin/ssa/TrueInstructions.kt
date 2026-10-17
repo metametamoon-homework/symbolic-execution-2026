@@ -72,7 +72,7 @@ class Cache(
 }
 
 /** The instructions that have `register` prefix in go's type struct definitions */
-abstract class TypedValue(private val rawType: Int, private val cache: Cache) : TrueValue {
+sealed class TypedValue(private val rawType: Int, private val cache: Cache) : TrueValue {
   override val type: TrueType by lazy { cache.instantiateTypeByIndex(rawType) }
 }
 

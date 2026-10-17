@@ -13,7 +13,12 @@ data class Block(
 )
 
 @Serializable
-data class Func(val name: String, val goName: String, val blocks: List<Block> = emptyList())
+data class Func(
+  val name: String,
+  val goName: String,
+  val params: List<Int> = emptyList(),
+  val blocks: List<Block> = emptyList(),
+)
 
 @Serializable
 data class Program(
@@ -23,7 +28,6 @@ data class Program(
   val funcs: List<Func> = emptyList(),
 )
 
-@Serializable
 data class TrueBlock(
   val index: Int,
   val succs: List<Int> = emptyList(),
@@ -31,10 +35,14 @@ data class TrueBlock(
   val prefs: List<Int> = emptyList(),
 )
 
-@Serializable
-data class TrueFunc(val name: String, val goName: String, val blocks: List<TrueBlock> = emptyList())
+data class TrueFunc(
+  val name: String,
+  val goName: String,
+  val params: List<TrueParameter> = emptyList(),
+  val blocks: List<TrueBlock> = emptyList(),
+)
 
-@Serializable data class TrueProgram(val funcs: List<TrueFunc> = emptyList())
+data class TrueProgram(val funcs: List<TrueFunc> = emptyList())
 
 private val json = Json {
   ignoreUnknownKeys = true
@@ -50,7 +58,12 @@ private fun loadSsa(helper: File, goProjectDir: File): Program {
 }
 
 fun Func.translate(cache: Cache): TrueFunc =
-  TrueFunc(name = name, goName = goName, blocks = blocks.map { it.translate(cache) })
+  TrueFunc(
+    name = name,
+    goName = goName,
+    params = params.map { cache.instantiateValueByIndex(it) as TrueParameter },
+    blocks = blocks.map { it.translate(cache) },
+  )
 
 fun Block.translate(cache: Cache): TrueBlock =
   TrueBlock(index, succs, instrs.map { cache.instantiateInstByIndex(it) })

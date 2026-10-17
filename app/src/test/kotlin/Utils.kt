@@ -1,5 +1,5 @@
-import com.github.metametamoon.app.interpreter.ExecutionResult
 import com.github.metametamoon.app.interpreter.GgResolvedState
+import com.github.metametamoon.app.interpreter.ResolvedExecutionResult
 import com.github.metametamoon.app.runProcess
 import java.nio.file.Files
 import java.nio.file.Path
@@ -38,8 +38,8 @@ fun testReproduction(goSource: String, resolvedState: GgResolvedState) {
     mainFile.writeText(mainContent)
 
     val expectedOutput =
-      when (val executionResult = resolvedState.executionResult) {
-        is ExecutionResult.Returns -> executionResult.value.toString()
+      when (val executionResult = resolvedState.resolvedExecutionResult) {
+        is ResolvedExecutionResult.Returns -> executionResult.value.toString()
       }
     assertEquals(expectedOutput, runGoProgram(freshDir))
   } finally {
