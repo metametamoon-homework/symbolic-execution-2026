@@ -1,9 +1,11 @@
 package com.github.metametamoon.app.interpreter
 
+import com.github.metametamoon.app.TrueBlock
 import com.github.metametamoon.app.TrueFunc
 import com.github.metametamoon.app.TrueInst
 import com.github.metametamoon.app.TrueParameter
 import com.github.metametamoon.app.TrueProgram
+import com.github.metametamoon.app.TrueValue
 import com.github.metametamoon.app.expr.GgBoolSort
 import com.github.metametamoon.app.expr.GgContext
 import com.github.metametamoon.app.expr.GgExpr
@@ -11,6 +13,7 @@ import com.github.metametamoon.app.expr.GgIntSort
 import com.github.metametamoon.app.expr.IntValue
 import com.microsoft.z3.Context
 import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toPersistentList
@@ -52,9 +55,13 @@ class GgState(
   var ip: InstructionPointer,
   val pathConstraints: PathConstraints = PathConstraints(),
   var executionStatus: ExecutionStatus = ExecutionStatus.Alive,
+  var valuesEvaluated: PersistentMap<TrueValue, GgExpr<*>> = persistentMapOf(),
 ) {
-  val id = stateIdCounter++
-  var paramMap = persistentMapOf<TrueParameter, GgExpr<GgIntSort>>()
+  val id: Int = stateIdCounter++
+  var paramMap: PersistentMap<TrueParameter, GgExpr<GgIntSort>> =
+    persistentMapOf<TrueParameter, GgExpr<GgIntSort>>()
+
+  var prevBlock: TrueBlock = ip.block()
 
   fun clone(): GgState {
     return GgState(
@@ -63,8 +70,12 @@ class GgState(
         ip = ip,
         pathConstraints = pathConstraints.clone(),
         executionStatus = executionStatus,
+        valuesEvaluated = valuesEvaluated,
       )
-      .also { it.paramMap = paramMap }
+      .also {
+        it.paramMap = paramMap
+        it.prevBlock = prevBlock
+      }
   }
 }
 
@@ -81,7 +92,9 @@ class GgResolvedState(
 
 class GgMachine(val source: TrueProgram) {
   private val z3ctx = Context()
-  private val interpreter = GgInterpreter()
+  val ctx = GgContext()
+  val solver = GgSolver(ctx, z3ctx)
+  private val interpreter = GgInterpreter(solver)
 
   fun resolveState(state: GgState, entryFunction: TrueFunc): GgResolvedState {
     val solver = GgSolver(state.ctx, z3ctx)
@@ -106,7 +119,7 @@ class GgMachine(val source: TrueProgram) {
   fun runSymbolicExecution(entryFunction: TrueFunc): List<GgState> {
     val initialState =
       GgState(
-        GgContext(),
+        ctx,
         source,
         InstructionPointer(entryFunction, entryFunction.blocks.first().instrs.first()),
       )

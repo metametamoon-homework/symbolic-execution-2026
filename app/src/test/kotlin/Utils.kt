@@ -49,7 +49,9 @@ fun testReproduction(goSource: String, resolvedState: GgResolvedState) {
 
 private fun runGoProgram(programDir: Path): String {
   val result = runProcess("go", "run", ".", workingDir = programDir.toFile())
-  println("stderr: ${result.stderr}")
+  if (result.stderr.trim().isNotEmpty()) {
+    println("stderr: ${result.stderr}")
+  }
   assertEquals(
     0,
     result.exitCode,

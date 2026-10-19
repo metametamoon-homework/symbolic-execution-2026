@@ -70,6 +70,9 @@ func main() {
 			for _, s := range b.Succs {
 				bb.Succs = append(bb.Succs, s.Index)
 			}
+			for _, p := range b.Preds {
+				bb.Preds = append(bb.Preds, p.Index)
+			}
 			for _, in := range b.Instrs {
 				bb.Instrs = append(bb.Instrs, uploadInstToCache(in, cache))
 			}

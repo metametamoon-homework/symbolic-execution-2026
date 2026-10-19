@@ -1,6 +1,8 @@
 package com.github.metametamoon.app.interpreter
 
+import com.github.metametamoon.app.expr.BoolValue
 import com.github.metametamoon.app.expr.ExprVisitor
+import com.github.metametamoon.app.expr.GgBoolSort
 import com.github.metametamoon.app.expr.GgContext
 import com.github.metametamoon.app.expr.GgExpr
 import com.github.metametamoon.app.expr.GgIntSort
@@ -8,8 +10,8 @@ import com.github.metametamoon.app.expr.GgSort
 import com.github.metametamoon.app.expr.IntConst
 import com.github.metametamoon.app.expr.IntValue
 import com.github.metametamoon.app.expr.Z3Translator
+import com.github.metametamoon.app.expr.runtimeExprCast
 import com.github.metametamoon.app.expr.uncheckedCast
-import com.github.metametamoon.app.expr.uncheckedExprCast
 import com.microsoft.z3.BoolSort
 import com.microsoft.z3.Context
 import com.microsoft.z3.Expr
@@ -28,9 +30,20 @@ sealed interface SolverResult {
 class GgModel(override val ctx: GgContext, val substitutions: Map<GgExpr<*>, GgExpr<*>>) :
   ExprVisitor {
 
+  private inline fun <reified Sort : GgSort> defaultValue(sort: Sort): GgExpr<Sort> {
+    if (sort is GgBoolSort) {
+      return BoolValue(true).runtimeExprCast()
+    }
+
+    if (sort is GgIntSort) {
+      return IntValue(0).runtimeExprCast()
+    }
+    error("Unknown sort $sort")
+  }
+
   private inline fun <reified Sort : GgSort> getLeafValue(before: GgExpr<Sort>): GgExpr<Sort> {
-    val after = substitutions[before] ?: error("No substitution for $before")
-    return after.uncheckedExprCast()
+    val after = substitutions[before] ?: defaultValue(before.sort)
+    return after.runtimeExprCast()
   }
 
   override fun visitInt32Const(expr: IntConst): GgExpr<GgIntSort> = getLeafValue(expr)
@@ -47,25 +60,29 @@ class GgSolver(val ctx: GgContext, val z3ctx: Context) {
       pathConstraints.logicalConstraints.map {
         translator.translate(it).uncheckedCast<Expr<BoolSort>, _>()
       }
+    z3Solver.push()
     z3Solver.add(*constraints.toTypedArray())
-    val result = z3Solver.check()
-    return when (result) {
-      Status.UNKNOWN -> SolverResult.Unknown(z3Solver.reasonUnknown)
-      Status.UNSATISFIABLE -> SolverResult.Unsat
-      Status.SATISFIABLE -> {
-        val z3model = z3Solver.model
-        val translated =
-          translator.leafValues.map { (z3Expr, expr) ->
-            val evalledGgExpr =
-              when (val evalledZ3 = z3model.eval(z3Expr, true)) {
-                is IntNum -> IntValue(evalledZ3.int)
-                is Any -> TODO()
-              }
-            expr to evalledGgExpr
-          }
-        val model = GgModel(ctx, translated.toMap())
-        SolverResult.Sat(model)
+    val z3Result = z3Solver.check()
+    val result =
+      when (z3Result) {
+        Status.UNKNOWN -> SolverResult.Unknown(z3Solver.reasonUnknown)
+        Status.UNSATISFIABLE -> SolverResult.Unsat
+        Status.SATISFIABLE -> {
+          val z3model = z3Solver.model
+          val translated =
+            translator.leafValues.map { (z3Expr, expr) ->
+              val evalledGgExpr =
+                when (val evalledZ3 = z3model.eval(z3Expr, true)) {
+                  is IntNum -> IntValue(evalledZ3.int)
+                  is Any -> TODO()
+                }
+              expr to evalledGgExpr
+            }
+          val model = GgModel(ctx, translated.toMap())
+          SolverResult.Sat(model)
+        }
       }
-    }
+    z3Solver.pop()
+    return result
   }
 }

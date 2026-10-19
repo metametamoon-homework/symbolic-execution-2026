@@ -9,7 +9,7 @@ data class Block(
   val index: Int,
   val succs: List<Int> = emptyList(),
   val instrs: List<Int> = emptyList(),
-  val prevs: List<Int> = emptyList(),
+  val preds: List<Int> = emptyList(),
 )
 
 @Serializable
@@ -32,7 +32,7 @@ data class TrueBlock(
   val index: Int,
   val succs: List<Int> = emptyList(),
   val instrs: List<TrueInst> = emptyList(),
-  val prefs: List<Int> = emptyList(),
+  val preds: List<Int> = emptyList(),
 )
 
 data class TrueFunc(
@@ -52,7 +52,6 @@ private val json = Json {
 
 private fun loadSsa(helper: File, goProjectDir: File): Program {
   val result = runProcess(helper.path, goProjectDir.path)
-  println("errs:${result.stderr}")
   check(result.exitCode == 0) { "go-ssa-dump failed:\n${result.stderr}" }
   return json.decodeFromString(result.stdout)
 }
@@ -66,7 +65,7 @@ fun Func.translate(cache: Cache): TrueFunc =
   )
 
 fun Block.translate(cache: Cache): TrueBlock =
-  TrueBlock(index, succs, instrs.map { cache.instantiateInstByIndex(it) })
+  TrueBlock(index, succs, instrs.map { cache.instantiateInstByIndex(it) }, preds)
 
 fun Program.translate(cache: Cache): TrueProgram =
   TrueProgram(funcs = funcs.map { it.translate(cache) })

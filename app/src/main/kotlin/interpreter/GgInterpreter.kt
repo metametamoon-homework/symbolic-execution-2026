@@ -26,11 +26,27 @@ import com.github.metametamoon.app.TypedValue
 import com.github.metametamoon.app.expr.GgBoolSort
 import com.github.metametamoon.app.expr.GgExpr
 import com.github.metametamoon.app.expr.GgIntSort
-import com.github.metametamoon.app.expr.uncheckedExprCast
+import com.github.metametamoon.app.expr.runtimeExprCast
 
 fun InstructionPointer.block(): TrueBlock = function.blocks.single { instruction in it.instrs }
 
-class GgInterpreter {
+class GgInterpreter(val solver: GgSolver) {
+
+  fun lookupValue(state: GgState, value: TrueValue): GgExpr<*> {
+    val storedInRegister = state.valuesEvaluated[value]
+    return when {
+      storedInRegister != null -> storedInRegister
+      value is TrueParameter -> {
+        state.paramMap[value] ?: error("no param ???")
+      }
+
+      value is TrueConst -> {
+        state.ctx.mkIntValue(value.value.toString().toInt())
+      }
+
+      else -> TODO()
+    }
+  }
 
   fun evalValue(state: GgState, value: TrueValue): GgExpr<*> {
     return when (value) {
@@ -41,11 +57,13 @@ class GgInterpreter {
             val leftValue = value.lhs
             val rightValue = value.rhs
 
-            val leftEvaluated = evalValue(state, leftValue).uncheckedExprCast<GgIntSort, _>()
-            val rightEvaluated = evalValue(state, rightValue).uncheckedExprCast<GgIntSort, _>()
+            val leftEvaluated = lookupValue(state, leftValue).runtimeExprCast<GgIntSort, _>()
+            val rightEvaluated = lookupValue(state, rightValue).runtimeExprCast<GgIntSort, _>()
             when (value.op) {
               ">" -> state.ctx.mkGt(leftEvaluated, rightEvaluated)
+              "<" -> state.ctx.mkLt(leftEvaluated, rightEvaluated)
               "*" -> state.ctx.mkMul(leftEvaluated, rightEvaluated)
+              "+" -> state.ctx.mkAdd(leftEvaluated, rightEvaluated)
               else -> TODO("Unsupported")
             }
           }
@@ -65,7 +83,15 @@ class GgInterpreter {
             state.paramMap[value] ?: error("no param ???")
           }
 
-          is TruePhi -> TODO()
+          is TruePhi -> {
+
+            val joins = value.sources
+            val currentBlock = state.ip.block()
+            val idx = currentBlock.preds.indexOf(state.prevBlock.index)
+            val value = joins[idx]
+            lookupValue(state, value)
+          }
+
           is TrueUnOp -> TODO()
         }
     }
@@ -86,18 +112,35 @@ class GgInterpreter {
     val falseState: GgState?,
   )
 
-  fun fork(state: GgState, condition: GgExpr<GgBoolSort>): ForkResult {
-    val falseState = state.clone()
+  private fun fork(state: GgState, condition: GgExpr<GgBoolSort>): ForkResult {
+    val forkedState: GgState = state.clone()
     state.pathConstraints.addCs(condition)
-    falseState.pathConstraints.addCs(state.ctx.mkNot(condition))
-    return ForkResult(state, falseState)
+    forkedState.pathConstraints.addCs(state.ctx.mkNot(condition))
+    val trueBranchSolverResult = solver.solve(state.pathConstraints)
+    val trueState =
+      if (trueBranchSolverResult is SolverResult.Sat) {
+        state
+      } else null
+    val falseBranchSolverResult = solver.solve(forkedState.pathConstraints)
+    val falseState =
+      if (falseBranchSolverResult is SolverResult.Sat) {
+        forkedState
+      } else null
+
+    return ForkResult(trueState, falseState)
   }
 
   fun step(state: GgState): List<GgState> {
     val stmt = state.ip.instruction
+    val blockIdx = state.ip.function.blocks.indexOf(state.ip.block())
+    println(
+      "state=${state.id} block=$blockIdx stmt=${stmt::class.simpleName} (${stmt::class.qualifiedName})"
+    )
     when (stmt) {
       is TrueAlloc -> TODO()
       is TrueBinOp -> {
+        val value = evalValue(state, stmt)
+        state.valuesEvaluated = state.valuesEvaluated.putting(stmt, value)
         nextStmt(state)
         return listOf(state)
       }
@@ -105,7 +148,7 @@ class GgInterpreter {
       is TrueCall -> TODO()
       is TrueDefer -> TODO()
       is TrueIf -> {
-        val binOpCond = evalValue(state, stmt.cond).uncheckedExprCast<GgBoolSort, _>()
+        val binOpCond = evalValue(state, stmt.cond).runtimeExprCast<GgBoolSort, _>()
         val func = state.ip.function
         val block = state.ip.block()
         val trueBlock = func.blocks[block.succs[0]]
@@ -113,24 +156,42 @@ class GgInterpreter {
         val forking = fork(state, binOpCond)
         forking.trueState?.let {
           it.ip = InstructionPointer(it.ip.function, trueBlock.instrs.first())
+          it.prevBlock = block
         }
 
         forking.falseState?.let {
           it.ip = InstructionPointer(it.ip.function, falseBlock.instrs.first())
+          it.prevBlock = block
         }
         return listOfNotNull(forking.trueState, forking.falseState)
       }
 
       is TrueIndexAddr -> TODO()
-      is TrueJump -> TODO()
+      is TrueJump -> {
+        val func = state.ip.function
+        val block = state.ip.block()
+        val trueBlock = func.blocks[block.succs[0]]
+        state.ip = InstructionPointer(func, trueBlock.instrs.first())
+        state.prevBlock = block
+        return listOf(state)
+      }
+
       is TrueMakeInterface -> TODO()
       is TruePanic -> TODO()
-      is TruePhi -> TODO()
+      is TruePhi -> {
+
+        val value = evalValue(state, stmt)
+        state.valuesEvaluated = state.valuesEvaluated.putting(stmt, value)
+        nextStmt(state)
+        return listOf(state)
+      }
+
       is TrueReturn -> {
-        val returnedValues = stmt.results.map { evalValue(state, it) }
+        val returnedValues = stmt.results.map { lookupValue(state, it) }
         state.executionStatus = ExecutionStatus.Returned(returnedValues)
         return listOf(state)
       }
+
       is TrueRunDefers -> TODO()
       is TrueStore -> TODO()
       is TrueUnOp -> TODO()

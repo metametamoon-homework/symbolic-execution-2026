@@ -31,10 +31,10 @@ func nestedIf(x, y int) int {
 	return 0
 }
 
-// Функция с простым циклом
+// Функция с очень простым циклом
 func simpleLoop(n int) int {
 	sum := 0
-	for i := 0; i < n; i++ {
+	for i := 0; i < 5; i++ {
 		sum += i
 	}
 	return sum

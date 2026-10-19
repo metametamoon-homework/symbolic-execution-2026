@@ -26,6 +26,11 @@ class BasicTests {
     val machine = GgMachine(ssa)
     val resolvedStates = machine.runSymbolicExecutionAndResolve(entryFunc)
     assert(resolvedStates.isNotEmpty())
+    for (resolvedState in resolvedStates) {
+      println(
+        "State: ${resolvedState.entryFunction.goName}: ${resolvedState.initialParameters.joinToString(",")} -> ${resolvedState.resolvedExecutionResult}"
+      )
+    }
     if (expectedNumberOfStates != null) {
       assertEquals(expected = expectedNumberOfStates, actual = resolvedStates.size)
     }
@@ -35,9 +40,26 @@ class BasicTests {
   }
 
   @Test
-  fun `first test`() {
+  fun `simpleIf interpretation`() {
     val testFile = File("../go/example-1-nomain/main.go")
-    println(testFile.absolutePath)
     baseTest(testFile.readText(), "simpleIf", expectedNumberOfStates = 2)
+  }
+
+  @Test
+  fun `ifElse interpretation`() {
+    val testFile = File("../go/example-1-nomain/main.go")
+    baseTest(testFile.readText(), "ifElse", expectedNumberOfStates = 2)
+  }
+
+  @Test
+  fun `nestedIf interpretation`() {
+    val testFile = File("../go/example-1-nomain/main.go")
+    baseTest(testFile.readText(), "nestedIf", expectedNumberOfStates = 3)
+  }
+
+  @Test
+  fun `very simple loop`() {
+    val testFile = File("../go/example-1-nomain/main.go")
+    baseTest(testFile.readText(), "simpleLoop", expectedNumberOfStates = 1)
   }
 }

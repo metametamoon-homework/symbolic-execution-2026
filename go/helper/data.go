@@ -12,6 +12,7 @@ import (
 type Block struct {
 	Index  int   `json:"index"`
 	Succs  []int `json:"succs"`
+	Preds  []int `json:"preds"`
 	Instrs []int `json:"instrs"`
 }
 
