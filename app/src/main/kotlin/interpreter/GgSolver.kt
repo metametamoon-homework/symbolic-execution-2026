@@ -1,5 +1,6 @@
 package com.github.metametamoon.app.interpreter
 
+import com.github.metametamoon.app.expr.BoolConst
 import com.github.metametamoon.app.expr.BoolValue
 import com.github.metametamoon.app.expr.ExprVisitor
 import com.github.metametamoon.app.expr.GgBoolSort
@@ -12,6 +13,7 @@ import com.github.metametamoon.app.expr.IntValue
 import com.github.metametamoon.app.expr.Z3Translator
 import com.github.metametamoon.app.expr.runtimeExprCast
 import com.github.metametamoon.app.expr.uncheckedCast
+import com.microsoft.z3.BoolExpr
 import com.microsoft.z3.BoolSort
 import com.microsoft.z3.Context
 import com.microsoft.z3.Expr
@@ -47,6 +49,8 @@ class GgModel(override val ctx: GgContext, val substitutions: Map<GgExpr<*>, GgE
   }
 
   override fun visitInt32Const(expr: IntConst): GgExpr<GgIntSort> = getLeafValue(expr)
+
+  override fun visitBoolConst(expr: BoolConst): GgExpr<GgBoolSort> = getLeafValue(expr)
 }
 
 class GgSolver(val ctx: GgContext, val z3ctx: Context) {
@@ -74,6 +78,7 @@ class GgSolver(val ctx: GgContext, val z3ctx: Context) {
               val evalledGgExpr =
                 when (val evalledZ3 = z3model.eval(z3Expr, true)) {
                   is IntNum -> IntValue(evalledZ3.int)
+                  is BoolExpr -> BoolValue(evalledZ3.isTrue)
                   is Any -> TODO()
                 }
               expr to evalledGgExpr

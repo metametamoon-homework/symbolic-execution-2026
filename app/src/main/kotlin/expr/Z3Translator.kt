@@ -13,6 +13,7 @@ class Z3Translator(private val z3ctx: Context) {
     return when (expr) {
       is Eq -> z3ctx.mkEq(translate(expr.left), translate(expr.right))
       is IntConst -> z3ctx.mkIntConst(expr.name).also { leafValues[it] = expr }
+      is BoolConst -> z3ctx.mkBoolConst(expr.name).also { leafValues[it] = expr }
       is IntValue -> z3ctx.mkInt(expr.value)
       is BoolValue -> z3ctx.mkBool(expr.value)
       is Add ->
@@ -33,6 +34,36 @@ class Z3Translator(private val z3ctx: Context) {
       is Not -> z3ctx.mkNot(translate(expr.operand).uncheckedCast())
       is Mul ->
         z3ctx.mkMul<ArithSort>(
+          translate(expr.left).uncheckedCast(),
+          translate(expr.right).uncheckedCast(),
+        )
+
+      is Ne -> z3ctx.mkDistinct(translate(expr.left), translate(expr.right))
+      is Sub ->
+        z3ctx.mkSub<ArithSort>(
+          translate(expr.left).uncheckedCast(),
+          translate(expr.right).uncheckedCast(),
+        )
+
+      is Div ->
+        z3ctx.mkDiv<ArithSort>(
+          translate(expr.left).uncheckedCast(),
+          translate(expr.right).uncheckedCast(),
+        )
+
+      is Mod ->
+        z3ctx.mkMod(translate(expr.left).uncheckedCast(), translate(expr.right).uncheckedCast())
+      is Le ->
+        z3ctx.mkLe(translate(expr.left).uncheckedCast(), translate(expr.right).uncheckedCast())
+      is Ge ->
+        z3ctx.mkGe(translate(expr.left).uncheckedCast(), translate(expr.right).uncheckedCast())
+      is Or ->
+        z3ctx.mkOr(
+          *expr.operands.map { translate(it).uncheckedCast<Expr<BoolSort>, _>() }.toTypedArray()
+        )
+
+      is Implies ->
+        z3ctx.mkImplies(
           translate(expr.left).uncheckedCast(),
           translate(expr.right).uncheckedCast(),
         )
