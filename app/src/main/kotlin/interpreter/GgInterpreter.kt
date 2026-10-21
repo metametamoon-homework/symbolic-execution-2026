@@ -30,9 +30,9 @@ import com.github.metametamoon.app.expr.runtimeExprCast
 
 fun InstructionPointer.block(): TrueBlock = function.blocks.single { instruction in it.instrs }
 
-class GgInterpreter(val solver: GgSolver) {
+class GgInterpreter(private val solver: GgSolver) {
 
-  fun lookupValue(state: GgState, value: TrueValue): GgExpr<*> {
+  private fun lookupValue(state: GgState, value: TrueValue): GgExpr<*> {
     val storedInRegister = state.valuesEvaluated[value]
     return when {
       storedInRegister != null -> storedInRegister
@@ -48,7 +48,7 @@ class GgInterpreter(val solver: GgSolver) {
     }
   }
 
-  fun evalValue(state: GgState, value: TrueValue): GgExpr<*> {
+  private fun evalValue(state: GgState, value: TrueValue): GgExpr<*> {
     return when (value) {
       is TypedValue ->
         when (value) {

@@ -19,9 +19,7 @@ class BasicTests {
         """
           .trimIndent()
       )
-    val helperPath = File("go/helper/go-ssa-dump")
     val ssa = fullyLoadSsa(tmpProjectDir)
-    //    printSsaInfo(ssa)
     val entryFunc = ssa.funcs.single { it.goName == funcName }
     val machine = GgMachine(ssa)
     val resolvedStates = machine.runSymbolicExecutionAndResolve(entryFunc)
