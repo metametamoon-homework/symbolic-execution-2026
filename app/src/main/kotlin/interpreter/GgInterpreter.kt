@@ -6,10 +6,13 @@ import com.github.metametamoon.app.TrueBlock
 import com.github.metametamoon.app.TrueBuiltin
 import com.github.metametamoon.app.TrueCall
 import com.github.metametamoon.app.TrueConst
+import com.github.metametamoon.app.TrueConvert
 import com.github.metametamoon.app.TrueDefer
+import com.github.metametamoon.app.TrueFieldAddr
 import com.github.metametamoon.app.TrueFunctionRef
 import com.github.metametamoon.app.TrueGlobal
 import com.github.metametamoon.app.TrueIf
+import com.github.metametamoon.app.TrueIndex
 import com.github.metametamoon.app.TrueIndexAddr
 import com.github.metametamoon.app.TrueJump
 import com.github.metametamoon.app.TrueMakeInterface
@@ -19,6 +22,7 @@ import com.github.metametamoon.app.TrueParameter
 import com.github.metametamoon.app.TruePhi
 import com.github.metametamoon.app.TrueReturn
 import com.github.metametamoon.app.TrueRunDefers
+import com.github.metametamoon.app.TrueSlice
 import com.github.metametamoon.app.TrueStore
 import com.github.metametamoon.app.TrueUnOp
 import com.github.metametamoon.app.TrueValue
@@ -70,13 +74,17 @@ class GgInterpreter(private val solver: GgSolver) {
 
           is TrueBuiltin -> TODO()
           is TrueCall -> TODO()
+          is TrueConvert -> TODO()
           is TrueConst -> {
             state.ctx.mkIntValue(value.value.toString().toInt())
           }
 
           is TrueFunctionRef -> TODO()
           is TrueGlobal -> TODO()
+          is TrueIndex -> TODO()
           is TrueIndexAddr -> TODO()
+          is TrueFieldAddr -> TODO()
+          is TrueSlice -> TODO()
           is TrueMakeInterface -> TODO()
           is TrueOpaque -> TODO()
           is TrueParameter -> {
@@ -146,6 +154,7 @@ class GgInterpreter(private val solver: GgSolver) {
       }
 
       is TrueCall -> TODO()
+      is TrueConvert -> TODO()
       is TrueDefer -> TODO()
       is TrueIf -> {
         val binOpCond = evalValue(state, stmt.cond).runtimeExprCast<GgBoolSort, _>()
@@ -166,7 +175,10 @@ class GgInterpreter(private val solver: GgSolver) {
         return listOfNotNull(forking.trueState, forking.falseState)
       }
 
+      is TrueIndex -> TODO()
       is TrueIndexAddr -> TODO()
+      is TrueFieldAddr -> TODO()
+      is TrueSlice -> TODO()
       is TrueJump -> {
         val func = state.ip.function
         val block = state.ip.block()

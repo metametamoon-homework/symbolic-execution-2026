@@ -31,14 +31,18 @@ class Cache(
   private fun convertInst(rawInst: Instruction): TrueInst =
     when (rawInst) {
       is UnOp -> TrueUnOp(rawInst.type, rawInst.op, rawInst.arg, this)
+      is Convert -> TrueConvert(rawInst.type, rawInst.x, this)
       is BinOp -> TrueBinOp(rawInst.type, rawInst.op, rawInst.lhs, rawInst.rhs, this)
       is Alloc -> TrueAlloc(rawInst.type, rawInst.heap, this)
       is Call -> TrueCall(rawInst.type, rawInst.value, rawInst.args, this)
+      is Index -> TrueIndex(rawInst.type, rawInst.collection, rawInst.index, this)
       is IndexAddr -> TrueIndexAddr(rawInst.type, rawInst.collection, rawInst.index, this)
+      is FieldAddr -> TrueFieldAddr(rawInst.type, rawInst.struct, rawInst.field, this)
       is MakeInterface -> TrueMakeInterface(rawInst.type, rawInst.value, this)
       is Phi -> TruePhi(rawInst.type, rawInst.edges, this)
       is If -> TrueIf(rawInst.cond, this)
       is Jump -> TrueJump()
+      is Slice -> TrueSlice(rawInst.type, rawInst.x, rawInst.low, rawInst.high, rawInst.max, this)
       is Panic -> TruePanic(rawInst.value, this)
       is Store -> TrueStore(rawInst.addr, rawInst.value, this)
       is Defer -> TrueDefer()
@@ -66,8 +70,11 @@ class Cache(
       is BasicType -> TrueBasicType(rawType.name)
       is PointerType -> TruePointerType(rawType.elem, this)
       is SliceType -> TrueSliceType(rawType.elem, this)
+      is ArrayType -> TrueArrayType(rawType.len, rawType.elem, this)
+      is StructType -> TrueStructType(rawType.fields, this)
       is InterfaceType -> TrueInterfaceType()
       is SignatureType -> TrueSignatureType(rawType.params, rawType.results, this)
+      is TupleType -> TrueTupleType(rawType.values, this)
     }
 }
 
@@ -79,6 +86,11 @@ sealed class TypedValue(private val rawType: Int, private val cache: Cache) : Tr
 class TrueUnOp(rawType: Int, val op: String, private val rawArg: Int, private val cache: Cache) :
   TypedValue(rawType, cache), TrueInst {
   val arg: TrueValue by lazy { cache.instantiateValueByIndex(rawArg) }
+}
+
+class TrueConvert(rawType: Int, private val rawX: Int, private val cache: Cache) :
+  TypedValue(rawType, cache), TrueInst {
+  val x: TrueValue by lazy { cache.instantiateValueByIndex(rawX) }
 }
 
 class TrueBinOp(
@@ -105,6 +117,16 @@ class TrueCall(
   val args: List<TrueValue> by lazy { rawArgs.map { cache.instantiateValueByIndex(it) } }
 }
 
+class TrueIndex(
+  rawType: Int,
+  private val rawCollection: Int,
+  private val rawIndex: Int,
+  private val cache: Cache,
+) : TypedValue(rawType, cache), TrueInst {
+  val collection: TrueValue by lazy { cache.instantiateValueByIndex(rawCollection) }
+  val index: TrueValue by lazy { cache.instantiateValueByIndex(rawIndex) }
+}
+
 class TrueIndexAddr(
   rawType: Int,
   private val rawCollection: Int,
@@ -113,6 +135,29 @@ class TrueIndexAddr(
 ) : TypedValue(rawType, cache), TrueInst {
   val collection: TrueValue by lazy { cache.instantiateValueByIndex(rawCollection) }
   val index: TrueValue by lazy { cache.instantiateValueByIndex(rawIndex) }
+}
+
+class TrueFieldAddr(
+  rawType: Int,
+  private val rawStruct: Int,
+  val field: Int,
+  private val cache: Cache,
+) : TypedValue(rawType, cache), TrueInst {
+  val struct: TrueValue by lazy { cache.instantiateValueByIndex(rawStruct) }
+}
+
+class TrueSlice(
+  rawType: Int,
+  private val rawX: Int,
+  private val rawLow: Int?,
+  private val rawHigh: Int?,
+  private val rawMax: Int?,
+  private val cache: Cache,
+) : TypedValue(rawType, cache), TrueInst {
+  val x: TrueValue by lazy { cache.instantiateValueByIndex(rawX) }
+  val low: TrueValue? by lazy { rawLow?.let { cache.instantiateValueByIndex(it) } }
+  val high: TrueValue? by lazy { rawHigh?.let { cache.instantiateValueByIndex(it) } }
+  val max: TrueValue? by lazy { rawMax?.let { cache.instantiateValueByIndex(it) } }
 }
 
 class TrueMakeInterface(rawType: Int, private val rawValue: Int, private val cache: Cache) :
@@ -171,7 +216,19 @@ class TrueSliceType(private val rawElem: Int, private val cache: Cache) : TrueTy
   val elem: TrueType by lazy { cache.instantiateTypeByIndex(rawElem) }
 }
 
+class TrueArrayType(val len: Int, private val rawElem: Int, private val cache: Cache) : TrueType {
+  val elem: TrueType by lazy { cache.instantiateTypeByIndex(rawElem) }
+}
+
+class TrueStructType(private val rawFields: List<Int>, private val cache: Cache) : TrueType {
+  val fields: List<TrueType> by lazy { rawFields.map { cache.instantiateTypeByIndex(it) } }
+}
+
 class TrueInterfaceType : TrueType
+
+class TrueTupleType(private val rawValues: List<Int>, private val cache: Cache) : TrueType {
+  val values: List<TrueType> by lazy { rawValues.map { cache.instantiateTypeByIndex(it) } }
+}
 
 class TrueSignatureType(
   private val rawParams: List<Int>,

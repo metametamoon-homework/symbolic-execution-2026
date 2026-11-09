@@ -75,6 +75,23 @@ func typeRepr(in types.Type, cache *SsaCache) map[string]any {
 			"kind": "basic",
 			"name": in.Name(),
 		}
+	case *types.Named:
+		return typeRepr(in.Underlying(), cache)
+	case *types.Array:
+		return map[string]any{
+			"kind": "array",
+			"len":  in.Len(),
+			"elem": uploadTypeToCache(in.Elem(), cache),
+		}
+	case *types.Struct:
+		fields := make([]int, in.NumFields())
+		for i := range fields {
+			fields[i] = uploadTypeToCache(in.Field(i).Type(), cache)
+		}
+		return map[string]any{
+			"kind":   "struct",
+			"fields": fields,
+		}
 	case *types.Pointer:
 		return map[string]any{
 			"kind": "pointer",
@@ -98,12 +115,20 @@ func typeRepr(in types.Type, cache *SsaCache) map[string]any {
 			"params":  uploadTupleToCache(in.Params(), cache),
 			"results": uploadTupleToCache(in.Results(), cache),
 		}
+	case *types.Tuple:
+		return map[string]any{
+			"kind":   "tuple",
+			"values": uploadTupleToCache(in, cache),
+		}
 	}
 	panic(fmt.Sprintf("unhandled type %T", in))
 }
 
 func constRepr(in *ssa.Const) any {
-	if in.Value != nil && in.Value.Kind() == constant.String {
+	if in.Value == nil {
+		return 0
+	}
+	if in.Value.Kind() == constant.String {
 		return constant.StringVal(in.Value)
 	}
 	return in.Value
@@ -118,6 +143,13 @@ func uploadValueToCache(in ssa.Value, cache *SsaCache) int {
 	cache.valueResolver[in] = index
 	cache.Values[index] = valueRepr(in, cache)
 	return index
+}
+
+func uploadOptionalValueToCache(in ssa.Value, cache *SsaCache) any {
+	if in == nil {
+		return nil
+	}
+	return uploadValueToCache(in, cache)
 }
 
 func uploadValuesToCache(in []ssa.Value, cache *SsaCache) []int {
@@ -189,6 +221,12 @@ func instrRepr(in ssa.Instruction, cache *SsaCache) map[string]any {
 			"op":   in.Op.String(),
 			"arg":  uploadValueToCache(in.X, cache),
 		}
+	case *ssa.Convert:
+		return map[string]any{
+			"kind": "convert",
+			"type": uploadTypeToCache(in.Type(), cache),
+			"x":    uploadValueToCache(in.X, cache),
+		}
 	case *ssa.BinOp:
 		return map[string]any{
 			"kind": "binop",
@@ -219,12 +257,35 @@ func instrRepr(in ssa.Instruction, cache *SsaCache) map[string]any {
 			"kind": "if",
 			"cond": uploadValueToCache(in.Cond, cache),
 		}
+	case *ssa.Index:
+		return map[string]any{
+			"kind":       "index",
+			"type":       uploadTypeToCache(in.Type(), cache),
+			"collection": uploadValueToCache(in.X, cache),
+			"index":      uploadValueToCache(in.Index, cache),
+		}
 	case *ssa.IndexAddr:
 		return map[string]any{
 			"kind":       "indexaddr",
 			"type":       uploadTypeToCache(in.Type(), cache),
 			"collection": uploadValueToCache(in.X, cache),
 			"index":      uploadValueToCache(in.Index, cache),
+		}
+	case *ssa.FieldAddr:
+		return map[string]any{
+			"kind":   "fieldaddr",
+			"type":   uploadTypeToCache(in.Type(), cache),
+			"struct": uploadValueToCache(in.X, cache),
+			"field":  in.Field,
+		}
+	case *ssa.Slice:
+		return map[string]any{
+			"kind": "slice",
+			"type": uploadTypeToCache(in.Type(), cache),
+			"x":    uploadValueToCache(in.X, cache),
+			"low":  uploadOptionalValueToCache(in.Low, cache),
+			"high": uploadOptionalValueToCache(in.High, cache),
+			"max":  uploadOptionalValueToCache(in.Max, cache),
 		}
 	case *ssa.Jump:
 		return map[string]any{
