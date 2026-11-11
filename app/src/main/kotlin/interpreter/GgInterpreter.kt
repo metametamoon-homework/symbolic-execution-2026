@@ -20,6 +20,7 @@ import com.github.metametamoon.app.TrueOpaque
 import com.github.metametamoon.app.TruePanic
 import com.github.metametamoon.app.TrueParameter
 import com.github.metametamoon.app.TruePhi
+import com.github.metametamoon.app.TruePointerType
 import com.github.metametamoon.app.TrueReturn
 import com.github.metametamoon.app.TrueRunDefers
 import com.github.metametamoon.app.TrueSlice
@@ -92,7 +93,6 @@ class GgInterpreter(private val solver: GgSolver) {
           }
 
           is TruePhi -> {
-
             val joins = value.sources
             val currentBlock = state.ip.block()
             val idx = currentBlock.preds.indexOf(state.prevBlock.index)
@@ -145,7 +145,15 @@ class GgInterpreter(private val solver: GgSolver) {
       "state=${state.id} block=$blockIdx stmt=${stmt::class.simpleName} (${stmt::class.qualifiedName})"
     )
     when (stmt) {
-      is TrueAlloc -> TODO()
+      is TrueAlloc -> {
+        val pointerType = stmt.type as TruePointerType
+        val allocated = state.ctx.alloc()
+        state.valuesEvaluated = state.valuesEvaluated.putting(stmt, allocated)
+        state.pointerToType = state.pointerToType.putting(allocated, pointerType)
+        nextStmt(state)
+        return listOf(state)
+      }
+
       is TrueBinOp -> {
         val value = evalValue(state, stmt)
         state.valuesEvaluated = state.valuesEvaluated.putting(stmt, value)
@@ -177,7 +185,17 @@ class GgInterpreter(private val solver: GgSolver) {
 
       is TrueIndex -> TODO()
       is TrueIndexAddr -> TODO()
-      is TrueFieldAddr -> TODO()
+      is TrueFieldAddr -> {
+        val structPtrValue = stmt.struct
+        val structValue = state.valuesEvaluated[structPtrValue] ?: error("bad")
+        val fieldId = stmt.field
+        val type = stmt.type
+        val value = state.ctx.allocFieldRead(type, fieldId, structValue)
+        state.valuesEvaluated = state.valuesEvaluated.putting(stmt, value)
+        nextStmt(state)
+        return listOf(state)
+      }
+
       is TrueSlice -> TODO()
       is TrueJump -> {
         val func = state.ip.function
@@ -205,8 +223,25 @@ class GgInterpreter(private val solver: GgSolver) {
       }
 
       is TrueRunDefers -> TODO()
-      is TrueStore -> TODO()
-      is TrueUnOp -> TODO()
+      is TrueStore -> {
+        val pointer = lookupValue(state, stmt.addr)
+        val value = lookupValue(state, stmt.value)
+        state.memory = state.memory.write(pointer, value)
+        nextStmt(state)
+        return listOf(state)
+      }
+
+      is TrueUnOp -> {
+        if (stmt.op == "*") {
+          val deferedPtr = lookupValue(state, stmt.arg)
+          //                    val type = stmt.type
+          val result = state.memory.read(deferedPtr)
+          state.valuesEvaluated = state.valuesEvaluated.putting(stmt, result)
+          nextStmt(state)
+          return listOf(state)
+        }
+        error("not implemented")
+      }
     }
   }
 }

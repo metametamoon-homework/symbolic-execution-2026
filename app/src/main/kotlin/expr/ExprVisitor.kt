@@ -53,5 +53,9 @@ interface ExprVisitor {
 
   fun visitOr(expr: Or): GgExpr<GgBoolSort> = ctx.mkOr(expr.operands.map { it.accept(this) })
 
+  fun visitStoreExpr(expr: Store<*, *>): GgExpr<*> = expr
+
+  fun visitSelectExpr(expr: Select<*, *>): GgExpr<*> = expr
+
   fun apply(expr: GgExpr<*>): GgExpr<*> = expr.accept(this)
 }

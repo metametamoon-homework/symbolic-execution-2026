@@ -1,5 +1,7 @@
 package com.github.metametamoon.app.expr
 
+import com.github.metametamoon.app.TrueType
+
 sealed interface GgExpr<out Sort : GgSort> {
   val sort: Sort
 
@@ -159,4 +161,75 @@ data class Implies(val left: GgExpr<GgBoolSort>, val right: GgExpr<GgBoolSort>) 
   override fun toExprString(): String = "(implies ${left.toExprString()} ${right.toExprString()})"
 
   override fun accept(visitor: ExprVisitor): GgExpr<GgBoolSort> = visitor.visitImplies(this)
+}
+
+sealed interface PointerExpr : GgExpr<GgIntSort>
+
+data class AllocatedPointerExpr(val address: Int) : PointerExpr {
+  override val sort: GgIntSort = GgIntSort()
+
+  override fun toExprString(): String = "0x$address" // ksmt-style :)
+
+  override fun accept(visitor: ExprVisitor): GgExpr<GgIntSort> =
+    visitor.visitIntValue(IntValue(address)) // TODO make ctx visible
+}
+
+data class FieldPointer(
+  val address: Int,
+  val structType: TrueType,
+  val fieldIdx: Int,
+  val structPointer: GgExpr<*>,
+) : PointerExpr {
+  override val sort: GgIntSort = GgIntSort()
+
+  override fun toExprString(): String = "(field-read $structType $fieldIdx)"
+
+  override fun accept(visitor: ExprVisitor): GgExpr<GgIntSort> {
+    TODO("Not yet implemented")
+  }
+}
+
+data class ArrayConst<FromSort : GgSort, ToSort : GgSort>(
+  val name: String,
+  val fromSort: FromSort,
+  val toSort: ToSort,
+) : GgExpr<GgArraySort<FromSort, ToSort>> {
+  override val sort: GgArraySort<FromSort, ToSort>
+    get() = GgArraySort(fromSort, toSort)
+
+  override fun toExprString(): String = name
+
+  override fun accept(visitor: ExprVisitor): GgExpr<GgArraySort<FromSort, ToSort>> {
+    TODO("Not yet implemented")
+  }
+}
+
+data class Store<FromSort : GgSort, ToSort : GgSort>(
+  val array: GgExpr<GgArraySort<FromSort, ToSort>>,
+  val index: GgExpr<FromSort>,
+  val value: GgExpr<ToSort>,
+) : GgExpr<GgArraySort<FromSort, ToSort>> {
+  override val sort: GgArraySort<FromSort, ToSort> = GgArraySort(index.sort, value.sort)
+
+  override fun accept(visitor: ExprVisitor): GgExpr<GgArraySort<FromSort, ToSort>> {
+    TODO("Not yet implemented")
+  }
+
+  override fun toExprString(): String {
+    TODO("Not yet implemented")
+  }
+}
+
+data class Select<FromSort : GgSort, ToSort : GgSort>(
+  val array: GgExpr<GgArraySort<FromSort, ToSort>>,
+  val index: GgExpr<FromSort>,
+) : GgExpr<ToSort> {
+  override val sort: ToSort = array.sort.toSort
+
+  override fun accept(visitor: ExprVisitor): GgExpr<ToSort> =
+    visitor.visitSelectExpr(this).uncheckedCast()
+
+  override fun toExprString(): String {
+    TODO("Not yet implemented")
+  }
 }

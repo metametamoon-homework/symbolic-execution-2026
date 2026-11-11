@@ -26,8 +26,10 @@ class GgMachine(val source: TrueProgram) {
       },
       when (val execStatus = state.executionStatus) {
         ExecutionStatus.Alive -> error("Alive")
-        is ExecutionStatus.Returned ->
-          ResolvedExecutionResult.Returns(result.model.apply(execStatus.value.single()).intValue())
+        is ExecutionStatus.Returned -> {
+          val apply = result.model.apply(execStatus.value.single())
+          ResolvedExecutionResult.Returns(apply.intValue())
+        }
       },
     )
   }
