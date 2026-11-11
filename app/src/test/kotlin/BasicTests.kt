@@ -67,7 +67,17 @@ class BasicTests {
 
   @Test
   fun `testStructBasic interpretation`() {
-    baseTest(mineStructsSource, "testStructBasic")
+    baseTest(mineStructsSource, "testStructBasic", expectedNumberOfStates = 1)
+  }
+
+  @Test
+  fun `multiple structs interpretation`() {
+    baseTest(mineStructsSource, "testMultipleStructs", expectedNumberOfStates = 1)
+  }
+
+  @Test
+  fun `struct pointer`() {
+    baseTest(mineStructsSource, "testStructPointer", expectedNumberOfStates = 1)
   }
 
   //  @Test
