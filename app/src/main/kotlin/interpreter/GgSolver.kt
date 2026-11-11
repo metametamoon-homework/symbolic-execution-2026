@@ -1,5 +1,6 @@
 package com.github.metametamoon.app.interpreter
 
+import com.github.metametamoon.app.expr.ArrayConst
 import com.github.metametamoon.app.expr.BoolConst
 import com.github.metametamoon.app.expr.BoolValue
 import com.github.metametamoon.app.expr.ExprVisitor
@@ -10,6 +11,8 @@ import com.github.metametamoon.app.expr.GgIntSort
 import com.github.metametamoon.app.expr.GgSort
 import com.github.metametamoon.app.expr.IntConst
 import com.github.metametamoon.app.expr.IntValue
+import com.github.metametamoon.app.expr.Select
+import com.github.metametamoon.app.expr.Store
 import com.github.metametamoon.app.expr.Z3Translator
 import com.github.metametamoon.app.expr.runtimeExprCast
 import com.github.metametamoon.app.expr.uncheckedCast
@@ -51,6 +54,27 @@ class GgModel(override val ctx: GgContext, val substitutions: Map<GgExpr<*>, GgE
   override fun visitInt32Const(expr: IntConst): GgExpr<GgIntSort> = getLeafValue(expr)
 
   override fun visitBoolConst(expr: BoolConst): GgExpr<GgBoolSort> = getLeafValue(expr)
+
+  override fun visitSelectExpr(expr: Select<*, *>): GgExpr<*> {
+    val queryIndex = apply(expr.index)
+    if (expr.array is Store<*, *>) {
+      val overwriteIndex = apply(expr.array.index)
+      return if (overwriteIndex.intValue() == queryIndex.intValue()) {
+        apply(expr.array.value)
+      } else {
+        apply(Select(expr.array.array, queryIndex.uncheckedCast()))
+      }
+    } else if (expr.array is ArrayConst<*, *>) {
+      return ctx.mkIntValue(0)
+      // TODO evaluate the array from model
+    } else {
+      error("what?")
+    }
+  }
+
+  override fun visitStoreExpr(expr: Store<*, *>): GgExpr<*> {
+    return super.visitStoreExpr(expr)
+  }
 }
 
 class GgSolver(val ctx: GgContext, val z3ctx: Context) {

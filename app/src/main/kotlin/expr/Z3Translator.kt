@@ -67,6 +67,16 @@ class Z3Translator(private val z3ctx: Context) {
           translate(expr.left).uncheckedCast(),
           translate(expr.right).uncheckedCast(),
         )
+
+      is PointerExpr -> {
+        when (expr) {
+          is AllocatedPointerExpr -> z3ctx.mkInt(expr.address)
+          is FieldPointer -> z3ctx.mkInt(expr.address) // probably wrong, FIXME
+        }
+      }
+      is Select<*, *> -> TODO()
+      is Store<*, *> -> TODO()
+      is ArrayConst<*, *> -> TODO()
     }
   }
 }

@@ -6,3 +6,5 @@ sealed interface GgSort
 class GgIntSort : GgSort
 
 class GgBoolSort : GgSort
+
+class GgArraySort<From : GgSort, To : GgSort>(val fromSort: From, val toSort: To) : GgSort

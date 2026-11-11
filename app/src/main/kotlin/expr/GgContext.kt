@@ -1,5 +1,6 @@
 package com.github.metametamoon.app.expr
 
+import com.github.metametamoon.app.TrueType
 import kotlin.math.absoluteValue
 
 class GgContext {
@@ -8,6 +9,9 @@ class GgContext {
   fun mkBoolValue(value: Boolean): GgExpr<GgBoolSort> = BoolValue(value)
 
   fun mkIntConst(name: String): GgExpr<GgIntSort> = IntConst(name)
+
+  fun mkArrayConst(name: String, fromSort: GgSort, toSort: GgSort) =
+    ArrayConst(name, fromSort, toSort)
 
   fun mkBoolConst(name: String): GgExpr<GgBoolSort> = BoolConst(name)
 
@@ -90,4 +94,12 @@ class GgContext {
   private fun euclideanMod(left: Int, right: Int): Int = left.mod(right.absoluteValue)
 
   private fun euclideanDiv(left: Int, right: Int): Int = (left - euclideanMod(left, right)) / right
+
+  private var allocCounter = 0
+
+  fun alloc(): AllocatedPointerExpr = AllocatedPointerExpr(allocCounter++)
+
+  fun allocFieldRead(structType: TrueType, fieldIdx: Int, structValue: GgExpr<*>): FieldPointer {
+    return FieldPointer(allocCounter++, structType, fieldIdx, structValue)
+  }
 }

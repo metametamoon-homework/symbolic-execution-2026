@@ -5,12 +5,15 @@ import com.github.metametamoon.app.TrueFunc
 import com.github.metametamoon.app.TrueInst
 import com.github.metametamoon.app.TrueParameter
 import com.github.metametamoon.app.TrueProgram
+import com.github.metametamoon.app.TrueType
 import com.github.metametamoon.app.TrueValue
 import com.github.metametamoon.app.expr.GgBoolSort
 import com.github.metametamoon.app.expr.GgContext
 import com.github.metametamoon.app.expr.GgExpr
 import com.github.metametamoon.app.expr.GgIntSort
+import com.github.metametamoon.app.expr.GgMemory
 import com.github.metametamoon.app.expr.IntValue
+import com.github.metametamoon.app.expr.PointerExpr
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentListOf
@@ -54,6 +57,8 @@ class GgState(
   val pathConstraints: PathConstraints = PathConstraints(),
   var executionStatus: ExecutionStatus = ExecutionStatus.Alive,
   var valuesEvaluated: PersistentMap<TrueValue, GgExpr<*>> = persistentMapOf(),
+  var pointerToType: PersistentMap<PointerExpr, TrueType> = persistentMapOf(),
+  var memory: GgMemory = GgMemory(ctx, persistentMapOf()),
 ) {
   val id: Int = stateIdCounter++
   var paramMap: PersistentMap<TrueParameter, GgExpr<GgIntSort>> =
@@ -69,6 +74,8 @@ class GgState(
         pathConstraints = pathConstraints.clone(),
         executionStatus = executionStatus,
         valuesEvaluated = valuesEvaluated,
+        pointerToType = pointerToType,
+        memory = memory,
       )
       .also {
         it.paramMap = paramMap

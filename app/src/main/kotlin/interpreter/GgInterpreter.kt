@@ -6,10 +6,13 @@ import com.github.metametamoon.app.TrueBlock
 import com.github.metametamoon.app.TrueBuiltin
 import com.github.metametamoon.app.TrueCall
 import com.github.metametamoon.app.TrueConst
+import com.github.metametamoon.app.TrueConvert
 import com.github.metametamoon.app.TrueDefer
+import com.github.metametamoon.app.TrueFieldAddr
 import com.github.metametamoon.app.TrueFunctionRef
 import com.github.metametamoon.app.TrueGlobal
 import com.github.metametamoon.app.TrueIf
+import com.github.metametamoon.app.TrueIndex
 import com.github.metametamoon.app.TrueIndexAddr
 import com.github.metametamoon.app.TrueJump
 import com.github.metametamoon.app.TrueMakeInterface
@@ -17,8 +20,10 @@ import com.github.metametamoon.app.TrueOpaque
 import com.github.metametamoon.app.TruePanic
 import com.github.metametamoon.app.TrueParameter
 import com.github.metametamoon.app.TruePhi
+import com.github.metametamoon.app.TruePointerType
 import com.github.metametamoon.app.TrueReturn
 import com.github.metametamoon.app.TrueRunDefers
+import com.github.metametamoon.app.TrueSlice
 import com.github.metametamoon.app.TrueStore
 import com.github.metametamoon.app.TrueUnOp
 import com.github.metametamoon.app.TrueValue
@@ -70,13 +75,17 @@ class GgInterpreter(private val solver: GgSolver) {
 
           is TrueBuiltin -> TODO()
           is TrueCall -> TODO()
+          is TrueConvert -> TODO()
           is TrueConst -> {
             state.ctx.mkIntValue(value.value.toString().toInt())
           }
 
           is TrueFunctionRef -> TODO()
           is TrueGlobal -> TODO()
+          is TrueIndex -> TODO()
           is TrueIndexAddr -> TODO()
+          is TrueFieldAddr -> TODO()
+          is TrueSlice -> TODO()
           is TrueMakeInterface -> TODO()
           is TrueOpaque -> TODO()
           is TrueParameter -> {
@@ -84,7 +93,6 @@ class GgInterpreter(private val solver: GgSolver) {
           }
 
           is TruePhi -> {
-
             val joins = value.sources
             val currentBlock = state.ip.block()
             val idx = currentBlock.preds.indexOf(state.prevBlock.index)
@@ -137,7 +145,15 @@ class GgInterpreter(private val solver: GgSolver) {
       "state=${state.id} block=$blockIdx stmt=${stmt::class.simpleName} (${stmt::class.qualifiedName})"
     )
     when (stmt) {
-      is TrueAlloc -> TODO()
+      is TrueAlloc -> {
+        val pointerType = stmt.type as TruePointerType
+        val allocated = state.ctx.alloc()
+        state.valuesEvaluated = state.valuesEvaluated.putting(stmt, allocated)
+        state.pointerToType = state.pointerToType.putting(allocated, pointerType)
+        nextStmt(state)
+        return listOf(state)
+      }
+
       is TrueBinOp -> {
         val value = evalValue(state, stmt)
         state.valuesEvaluated = state.valuesEvaluated.putting(stmt, value)
@@ -146,6 +162,7 @@ class GgInterpreter(private val solver: GgSolver) {
       }
 
       is TrueCall -> TODO()
+      is TrueConvert -> TODO()
       is TrueDefer -> TODO()
       is TrueIf -> {
         val binOpCond = evalValue(state, stmt.cond).runtimeExprCast<GgBoolSort, _>()
@@ -166,7 +183,20 @@ class GgInterpreter(private val solver: GgSolver) {
         return listOfNotNull(forking.trueState, forking.falseState)
       }
 
+      is TrueIndex -> TODO()
       is TrueIndexAddr -> TODO()
+      is TrueFieldAddr -> {
+        val structPtrValue = stmt.struct
+        val structValue = state.valuesEvaluated[structPtrValue] ?: error("bad")
+        val fieldId = stmt.field
+        val type = stmt.type
+        val value = state.ctx.allocFieldRead(type, fieldId, structValue)
+        state.valuesEvaluated = state.valuesEvaluated.putting(stmt, value)
+        nextStmt(state)
+        return listOf(state)
+      }
+
+      is TrueSlice -> TODO()
       is TrueJump -> {
         val func = state.ip.function
         val block = state.ip.block()
@@ -193,8 +223,25 @@ class GgInterpreter(private val solver: GgSolver) {
       }
 
       is TrueRunDefers -> TODO()
-      is TrueStore -> TODO()
-      is TrueUnOp -> TODO()
+      is TrueStore -> {
+        val pointer = lookupValue(state, stmt.addr)
+        val value = lookupValue(state, stmt.value)
+        state.memory = state.memory.write(pointer, value)
+        nextStmt(state)
+        return listOf(state)
+      }
+
+      is TrueUnOp -> {
+        if (stmt.op == "*") {
+          val deferedPtr = lookupValue(state, stmt.arg)
+          //                    val type = stmt.type
+          val result = state.memory.read(deferedPtr)
+          state.valuesEvaluated = state.valuesEvaluated.putting(stmt, result)
+          nextStmt(state)
+          return listOf(state)
+        }
+        error("not implemented")
+      }
     }
   }
 }
